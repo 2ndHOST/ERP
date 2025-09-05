@@ -5,6 +5,9 @@ test_api.html
 
 frontend/package-lock.json
 frontend/.env.local
+frontend/.next
+
+
 
 backend/.env
 backend/config.env
