@@ -79,10 +79,10 @@ export default function Home() {
             </div>
             <div className="mt-3 rounded-md shadow sm:mt-0 sm:ml-3">
               <Link 
-                href="/admissions" 
+                href="/register" 
                 className="w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-primary-600 bg-white hover:bg-gray-50 md:py-4 md:text-lg md:px-10"
               >
-                View Demo
+                Register Now
               </Link>
             </div>
           </div>

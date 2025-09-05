@@ -92,10 +92,51 @@ class Blockchain {
       type: type,
       recordId: record.id,
       recordHash: recordHash,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      metadata: {
+        recordType: type,
+        recordId: record.id,
+        addedAt: new Date().toISOString()
+      }
     };
     
     return this.addBlock(blockData);
+  }
+
+  // Verify a record against blockchain
+  verifyRecord(record, expectedHash) {
+    const calculatedHash = this.generateRecordHash(record);
+    const block = this.getBlockByHash(expectedHash);
+    
+    if (!block) {
+      return { valid: false, reason: 'Block not found in blockchain' };
+    }
+    
+    if (block.data.recordHash !== calculatedHash) {
+      return { valid: false, reason: 'Record hash mismatch' };
+    }
+    
+    return { valid: true, block: block };
+  }
+
+  // Get blockchain statistics
+  getStats() {
+    const stats = {
+      totalBlocks: this.chain.length,
+      isValid: this.isValid(),
+      lastBlockHash: this.getLatestBlock().hash,
+      genesisBlockHash: this.chain[0].hash,
+      blockTypes: {}
+    };
+    
+    // Count blocks by type
+    this.chain.forEach(block => {
+      if (block.data.type) {
+        stats.blockTypes[block.data.type] = (stats.blockTypes[block.data.type] || 0) + 1;
+      }
+    });
+    
+    return stats;
   }
 }
 

@@ -8,153 +8,125 @@ const router = express.Router();
 // Initialize blockchain instance
 const blockchain = new Blockchain();
 
-// Verify blockchain integrity
-router.get('/verify', authenticateToken, async (req, res) => {
+// Get blockchain statistics
+router.get('/stats', authenticateToken, async (req, res) => {
   try {
-    // Get all blocks from database
-    const [blocks] = await pool.execute(`
+    const stats = blockchain.getStats();
+    
+    // Get additional database stats
+    const [blockCount] = await pool.execute('SELECT COUNT(*) as count FROM blocks');
+    const [recentBlocks] = await pool.execute(`
       SELECT * FROM blocks 
-      ORDER BY block_index ASC
+      ORDER BY created_at DESC 
+      LIMIT 10
     `);
+    
+    res.json({
+      success: true,
+      blockchain: stats,
+      database: {
+        totalBlocks: blockCount[0].count,
+        recentBlocks: recentBlocks
+      }
+    });
+  } catch (error) {
+    console.error('Get blockchain stats error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
-    // Reconstruct blockchain from database
-    const reconstructedChain = [];
-    for (const block of blocks) {
-      reconstructedChain.push({
-        index: block.block_index,
-        timestamp: block.timestamp,
-        data: {
-          type: block.data_type,
-          recordId: block.record_id,
-          recordHash: block.data_hash
-        },
-        previousHash: block.prev_hash,
-        hash: block.block_hash
+// Verify a record against blockchain
+router.post('/verify', authenticateToken, async (req, res) => {
+  try {
+    const { recordType, recordId, blockchainHash } = req.body;
+    
+    if (!recordType || !recordId || !blockchainHash) {
+      return res.status(400).json({ 
+        error: 'Record type, record ID, and blockchain hash are required' 
       });
     }
-
-    // Verify chain integrity
-    let isValid = true;
-    const issues = [];
-
-    for (let i = 1; i < reconstructedChain.length; i++) {
-      const currentBlock = reconstructedChain[i];
-      const previousBlock = reconstructedChain[i - 1];
-
-      // Check if current block hash is valid
-      const expectedHash = require('crypto')
-        .createHash('sha256')
-        .update(
-          currentBlock.index + 
-          currentBlock.previousHash + 
-          currentBlock.timestamp + 
-          JSON.stringify(currentBlock.data)
-        )
-        .digest('hex');
-
-      if (currentBlock.hash !== expectedHash) {
-        isValid = false;
-        issues.push(`Block ${currentBlock.index}: Invalid hash`);
-      }
-
-      // Check if current block points to previous block
-      if (currentBlock.previousHash !== previousBlock.hash) {
-        isValid = false;
-        issues.push(`Block ${currentBlock.index}: Invalid previous hash reference`);
-      }
+    
+    // Get the record from database
+    let record = null;
+    let tableName = '';
+    
+    switch (recordType) {
+      case 'fee_payment':
+        tableName = 'fees';
+        const [fees] = await pool.execute(
+          'SELECT * FROM fees WHERE id = ?',
+          [recordId]
+        );
+        if (fees.length > 0) {
+          record = fees[0];
+        }
+        break;
+        
+      case 'admission':
+      case 'admission_update':
+        tableName = 'students';
+        const [students] = await pool.execute(
+          'SELECT * FROM students WHERE id = ?',
+          [recordId]
+        );
+        if (students.length > 0) {
+          record = students[0];
+        }
+        break;
+        
+      case 'hostel_allocation':
+      case 'hostel_deallocation':
+        tableName = 'hostel';
+        const [hostel] = await pool.execute(
+          'SELECT * FROM hostel WHERE id = ?',
+          [recordId]
+        );
+        if (hostel.length > 0) {
+          record = hostel[0];
+        }
+        break;
+        
+      default:
+        return res.status(400).json({ error: 'Invalid record type' });
     }
-
-    // Get blockchain statistics
-    const totalBlocks = reconstructedChain.length;
-    const blockTypes = {};
-    reconstructedChain.forEach(block => {
-      const type = block.data.type;
-      blockTypes[type] = (blockTypes[type] || 0) + 1;
-    });
-
+    
+    if (!record) {
+      return res.status(404).json({ error: 'Record not found' });
+    }
+    
+    // Verify against blockchain
+    const verification = blockchain.verifyRecord(record, blockchainHash);
+    
     res.json({
       success: true,
-      isValid,
-      issues,
-      statistics: {
-        totalBlocks,
-        blockTypes,
-        lastBlockHash: reconstructedChain.length > 0 
-          ? reconstructedChain[reconstructedChain.length - 1].hash 
-          : null,
-        firstBlockHash: reconstructedChain.length > 0 
-          ? reconstructedChain[0].hash 
-          : null
-      },
-      chain: reconstructedChain
+      verification: verification,
+      record: {
+        type: recordType,
+        id: recordId,
+        table: tableName,
+        data: record
+      }
     });
   } catch (error) {
-    console.error('Blockchain verification error:', error);
+    console.error('Verify record error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// Get blockchain status
-router.get('/status', authenticateToken, async (req, res) => {
+// Get blockchain chain
+router.get('/chain', authenticateToken, async (req, res) => {
   try {
-    // Get basic blockchain statistics
-    const [blockCount] = await pool.execute('SELECT COUNT(*) as count FROM blocks');
-    const [typeStats] = await pool.execute(`
-      SELECT data_type, COUNT(*) as count 
-      FROM blocks 
-      GROUP BY data_type
-    `);
-    const [latestBlock] = await pool.execute(`
-      SELECT * FROM blocks 
-      ORDER BY block_index DESC 
-      LIMIT 1
-    `);
-
+    const { limit = 50 } = req.query;
+    const chain = blockchain.getLastNBlocks(parseInt(limit));
+    
     res.json({
       success: true,
-      totalBlocks: blockCount[0].count,
-      blockTypes: typeStats,
-      latestBlock: latestBlock.length > 0 ? latestBlock[0] : null
+      chain: chain,
+      totalBlocks: blockchain.getChainLength(),
+      isValid: blockchain.isValid()
     });
   } catch (error) {
-    console.error('Get blockchain status error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Get block by hash
-router.get('/block/:hash', authenticateToken, async (req, res) => {
-  try {
-    const { hash } = req.params;
-
-    const [blocks] = await pool.execute(
-      'SELECT * FROM blocks WHERE block_hash = ?',
-      [hash]
-    );
-
-    if (blocks.length === 0) {
-      return res.status(404).json({ error: 'Block not found' });
-    }
-
-    const block = blocks[0];
-    const blockData = {
-      index: block.block_index,
-      timestamp: block.timestamp,
-      data: {
-        type: block.data_type,
-        recordId: block.record_id,
-        recordHash: block.data_hash
-      },
-      previousHash: block.prev_hash,
-      hash: block.block_hash
-    };
-
-    res.json({
-      success: true,
-      block: blockData
-    });
-  } catch (error) {
-    console.error('Get block error:', error);
+    console.error('Get blockchain chain error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -163,34 +135,36 @@ router.get('/block/:hash', authenticateToken, async (req, res) => {
 router.get('/blocks/:type', authenticateToken, async (req, res) => {
   try {
     const { type } = req.params;
-    const { limit = 50, offset = 0 } = req.query;
-
-    const [blocks] = await pool.execute(`
-      SELECT * FROM blocks 
-      WHERE data_type = ? 
-      ORDER BY block_index DESC 
-      LIMIT ? OFFSET ?
-    `, [type, parseInt(limit), parseInt(offset)]);
-
-    const blockData = blocks.map(block => ({
-      index: block.block_index,
-      timestamp: block.timestamp,
-      data: {
-        type: block.data_type,
-        recordId: block.record_id,
-        recordHash: block.data_hash
-      },
-      previousHash: block.prev_hash,
-      hash: block.block_hash
-    }));
-
+    const blocks = blockchain.getBlocksByType(type);
+    
     res.json({
       success: true,
-      blocks: blockData,
-      total: blocks.length
+      blocks: blocks,
+      count: blocks.length,
+      type: type
     });
   } catch (error) {
     console.error('Get blocks by type error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get block by hash
+router.get('/block/:hash', authenticateToken, async (req, res) => {
+  try {
+    const { hash } = req.params;
+    const block = blockchain.getBlockByHash(hash);
+    
+    if (!block) {
+      return res.status(404).json({ error: 'Block not found' });
+    }
+    
+    res.json({
+      success: true,
+      block: block
+    });
+  } catch (error) {
+    console.error('Get block by hash error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

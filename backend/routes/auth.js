@@ -66,6 +66,11 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'All fields are required' });
     }
 
+    // Validate required student data fields
+    if (!studentData.name || !studentData.course || !studentData.dob || !studentData.address) {
+      return res.status(400).json({ error: 'Name, course, date of birth, and address are required' });
+    }
+
     // Check if user already exists
     const [existingUsers] = await pool.execute(
       'SELECT * FROM users WHERE username = ? OR email = ?',
@@ -90,7 +95,7 @@ router.post('/register', async (req, res) => {
         'INSERT INTO students (name, email, course, dob, address, phone) VALUES (?, ?, ?, ?, ?, ?)',
         [
           studentData.name,
-          studentData.email,
+          email, // Use the email from the main request, not studentData
           studentData.course,
           studentData.dob,
           studentData.address,

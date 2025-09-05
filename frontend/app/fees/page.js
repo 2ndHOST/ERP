@@ -40,12 +40,14 @@ export default function FeesPage() {
   })
   const [formErrors, setFormErrors] = useState({})
 
-  // Redirect if not authenticated
+  // Redirect if not authenticated or not admin
   useEffect(() => {
     if (!isAuthenticated) {
       router.push('/login')
+    } else if (!isAdmin) {
+      router.push('/student')
     }
-  }, [isAuthenticated, router])
+  }, [isAuthenticated, isAdmin, router])
 
   // Load data
   useEffect(() => {

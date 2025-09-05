@@ -41,12 +41,14 @@ export default function AdmissionsPage() {
   })
   const [formErrors, setFormErrors] = useState({})
 
-  // Redirect if not authenticated
+  // Redirect if not authenticated or not admin
   useEffect(() => {
     if (!isAuthenticated) {
       router.push('/login')
+    } else if (!isAdmin) {
+      router.push('/student')
     }
-  }, [isAuthenticated, router])
+  }, [isAuthenticated, isAdmin, router])
 
   // Load students data
   useEffect(() => {

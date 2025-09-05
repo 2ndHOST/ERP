@@ -65,11 +65,14 @@ router.post('/', authenticateToken, requireAdmin, async (req, res) => {
     const block = blockchain.addRecord('admission', studentData);
 
     // Store block in database
+    // Convert ISO timestamp to MySQL datetime format
+    const mysqlTimestamp = new Date(block.timestamp).toISOString().slice(0, 19).replace('T', ' ');
+    
     await pool.execute(
       'INSERT INTO blocks (block_index, timestamp, data_hash, prev_hash, block_hash, data_type, record_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [
         block.index,
-        block.timestamp,
+        mysqlTimestamp,
         block.data.recordHash,
         block.previousHash,
         block.hash,
@@ -146,11 +149,14 @@ router.put('/:id', authenticateToken, requireAdmin, async (req, res) => {
     const block = blockchain.addRecord('admission_update', updatedStudent);
 
     // Store block in database
+    // Convert ISO timestamp to MySQL datetime format
+    const mysqlTimestamp = new Date(block.timestamp).toISOString().slice(0, 19).replace('T', ' ');
+    
     await pool.execute(
       'INSERT INTO blocks (block_index, timestamp, data_hash, prev_hash, block_hash, data_type, record_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [
         block.index,
-        block.timestamp,
+        mysqlTimestamp,
         block.data.recordHash,
         block.previousHash,
         block.hash,

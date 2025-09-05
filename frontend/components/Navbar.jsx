@@ -31,9 +31,9 @@ export default function Navbar() {
       { name: 'Hostel', href: '/hostel', icon: Building },
     ] : []),
     ...(isStudent ? [
-      { name: 'My Profile', href: '/admissions', icon: User },
-      { name: 'Fees', href: '/fees', icon: CreditCard },
-      { name: 'Hostel', href: '/hostel', icon: Building },
+      { name: 'Dashboard', href: '/student', icon: User },
+      { name: 'My Fees', href: '/student/fees', icon: CreditCard },
+      { name: 'My Hostel', href: '/student/hostel', icon: Building },
     ] : []),
   ]
 
@@ -116,7 +116,7 @@ export default function Navbar() {
                   Login
                 </Link>
                 <Link
-                  href="/admissions"
+                  href="/register"
                   className="btn btn-primary btn-sm"
                 >
                   Register

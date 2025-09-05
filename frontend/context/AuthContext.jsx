@@ -69,7 +69,7 @@ export const AuthProvider = ({ children }) => {
         if (user.role === 'admin') {
           router.push('/dashboard')
         } else {
-          router.push('/admissions')
+          router.push('/student')
         }
         
         return { success: true }
@@ -104,7 +104,7 @@ export const AuthProvider = ({ children }) => {
         toast.success('Registration successful!')
         
         // Redirect to appropriate page
-        router.push('/admissions')
+        router.push('/student')
         
         return { success: true }
       } else {

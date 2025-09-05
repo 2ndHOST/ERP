@@ -1,8 +1,11 @@
 {
   "/not-found": "app/not-found.js",
-  "/login/page": "app/login/page.js",
+  "/student/hostel/page": "app/student/hostel/page.js",
   "/page": "app/page.js",
+  "/student/fees/page": "app/student/fees/page.js",
+  "/student/page": "app/student/page.js",
+  "/login/page": "app/login/page.js",
   "/fees/page": "app/fees/page.js",
-  "/dashboard/page": "app/dashboard/page.js",
-  "/admissions/page": "app/admissions/page.js"
+  "/admissions/page": "app/admissions/page.js",
+  "/dashboard/page": "app/dashboard/page.js"
 }
